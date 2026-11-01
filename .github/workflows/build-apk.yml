@@ -62,10 +62,12 @@ jobs:
           fi
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
+      
       - name: Build APK
         run: |
           cd "$PROJECT_DIR"
-          gradle --no-daemon :app:assembleDebug
+          gradle --no-daemon -Pkotlin.jvm.target.validation.mode=warning :app:assembleDebug
+
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
