@@ -4,6 +4,8 @@ package com.neshi.pabrikneshi
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
+import android.graphics.Color
+import android.view.Gravity
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -11,42 +13,45 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
 import android.widget.Toast
-import android.graphics.Color
-import android.view.Gravity
 import org.json.JSONArray
 import org.json.JSONObject
 
 class MainActivity : Activity() {
 
     private val mapUrl = "https://aniidex.com/id/map/"
-    private val storageKey = "aniidex.map-progress"
+    private val progressStorageKey = "aniidex.map-progress"
     private val prefsName = "PabrikNeshiCustomers"
 
     private lateinit var webView: WebView
-    private lateinit var mainLayout: LinearLayout
     private lateinit var customerText: TextView
 
     private val prefs by lazy {
         getSharedPreferences(prefsName, MODE_PRIVATE)
     }
 
-    private var activeCustomer = "Pelanggan Lama"
     private var customers = mutableListOf<String>()
+    private var activeCustomer = "Pelanggan Lama"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        loadCustomerData()
-        buildInterface()
+
+        loadCustomers()
+        createInterface()
     }
 
-    private fun loadCustomerData() {
+    // =========================
+    // DATA PELANGGAN
+    // =========================
+
+    private fun loadCustomers() {
         val saved = prefs.getString("customer_list", null)
 
         if (saved == null) {
             customers = mutableListOf("Pelanggan Lama")
             activeCustomer = "Pelanggan Lama"
-            saveCustomerData()
+            saveCustomers()
         } else {
             try {
                 val array = JSONArray(saved)
@@ -74,94 +79,119 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun saveCustomerData() {
+    private fun saveCustomers() {
         prefs.edit()
-            .putString("customer_list", JSONArray(customers).toString())
+            .putString(
+                "customer_list",
+                JSONArray(customers).toString()
+            )
             .putString("active_customer", activeCustomer)
             .apply()
     }
 
-    private fun progressKey(customer: String): String {
-        return "progress_$customer"
+    private fun customerProgressKey(name: String): String {
+        return "progress_" + name
     }
 
-    private fun getProgress(customer: String): String {
-        return prefs.getString(progressKey(customer), "") ?: ""
+    private fun getCustomerProgress(name: String): String {
+        return prefs.getString(
+            customerProgressKey(name),
+            ""
+        ) ?: ""
     }
 
-    private fun saveProgress(customer: String, value: String) {
+    private fun saveCustomerProgress(
+        name: String,
+        value: String
+    ) {
         prefs.edit()
-            .putString(progressKey(customer), value)
+            .putString(customerProgressKey(name), value)
             .apply()
     }
 
-    private fun buildInterface() {
-        mainLayout = LinearLayout(this)
-        mainLayout.orientation = LinearLayout.VERTICAL
-        mainLayout.setBackgroundColor(Color.rgb(5, 8, 22))
+    // =========================
+    // TAMPILAN APLIKASI
+    // =========================
+
+    private fun createInterface() {
+        val root = LinearLayout(this)
+        root.orientation = LinearLayout.VERTICAL
+        root.setBackgroundColor(Color.rgb(5, 8, 22))
 
         val header = LinearLayout(this)
         header.orientation = LinearLayout.VERTICAL
-        header.setPadding(16, 12, 16, 10)
+        header.setPadding(12, 12, 12, 8)
         header.setBackgroundColor(Color.rgb(17, 24, 39))
 
         val title = TextView(this)
         title.text = "PABRIK NESHI"
-        title.textSize = 21f
+        title.textSize = 22f
         title.setTextColor(Color.WHITE)
         title.gravity = Gravity.CENTER
-        title.setPadding(0, 5, 0, 10)
         header.addView(title)
 
         customerText = TextView(this)
         customerText.textSize = 14f
         customerText.setTextColor(Color.WHITE)
         customerText.gravity = Gravity.CENTER
-        customerText.setPadding(0, 5, 0, 10)
+        customerText.setPadding(0, 10, 0, 10)
         header.addView(customerText)
 
-        val customerButtons = LinearLayout(this)
-        customerButtons.orientation = LinearLayout.HORIZONTAL
+        val customerRow = LinearLayout(this)
+        customerRow.orientation = LinearLayout.HORIZONTAL
 
-        customerButtons.addView(
+        customerRow.addView(
             makeButton("Pilih Pelanggan") {
                 showCustomerList()
             },
             weightedParams()
         )
 
-        customerButtons.addView(
+        customerRow.addView(
             makeButton("+ Tambah") {
-                showAddCustomer()
+                addCustomer()
             },
             weightedParams()
         )
 
-        header.addView(customerButtons)
-        mainLayout.addView(header)
+        header.addView(customerRow)
+
+        header.addView(
+            makeButton("CEK DATA PETA") {
+                inspectMapStorage()
+            }
+        )
+
+        root.addView(header)
 
         val navigation = LinearLayout(this)
         navigation.orientation = LinearLayout.HORIZONTAL
-        navigation.setPadding(5, 5, 5, 5)
 
         navigation.addView(
-            makeButton("HOME") { showHome() },
+            makeButton("HOME") {
+                showHome()
+            },
             weightedParams()
         )
 
         navigation.addView(
-            makeButton("MAP") { showMap() },
+            makeButton("MAP") {
+                openMap()
+            },
             weightedParams()
         )
 
         navigation.addView(
-            makeButton("INFO") { showInfo() },
+            makeButton("INFO") {
+                showInfo()
+            },
             weightedParams()
         )
 
-        mainLayout.addView(navigation)
+        root.addView(navigation)
 
         webView = WebView(this)
+
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.databaseEnabled = true
@@ -171,17 +201,26 @@ class MainActivity : Activity() {
             "PabrikNeshiBridge"
         )
 
+        webView.addJavascriptInterface(
+            StorageInspector(),
+            "AndroidStorageInspector"
+        )
+
         webView.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView?, url: String?) {
+
+            override fun onPageFinished(
+                view: WebView?,
+                url: String?
+            ) {
                 super.onPageFinished(view, url)
 
-                if (url?.startsWith(mapUrl) == true) {
+                if (url != null && url.startsWith(mapUrl)) {
                     installProgressWatcher()
                 }
             }
         }
 
-        mainLayout.addView(
+        root.addView(
             webView,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -190,7 +229,7 @@ class MainActivity : Activity() {
             )
         )
 
-        setContentView(mainLayout)
+        setContentView(root)
 
         updateCustomerLabel()
         showHome()
@@ -205,11 +244,11 @@ class MainActivity : Activity() {
     }
 
     private fun makeButton(
-        label: String,
+        text: String,
         action: () -> Unit
     ): Button {
         val button = Button(this)
-        button.text = label
+        button.text = text
         button.setTextColor(Color.WHITE)
         button.setBackgroundColor(Color.rgb(65, 75, 120))
         button.setOnClickListener { action() }
@@ -217,8 +256,13 @@ class MainActivity : Activity() {
     }
 
     private fun updateCustomerLabel() {
-        customerText.text = "Pelanggan aktif: $activeCustomer"
+        customerText.text =
+            "Pelanggan aktif: $activeCustomer"
     }
+
+    // =========================
+    // NAVIGASI
+    // =========================
 
     private fun showHome() {
         webView.loadDataWithBaseURL(
@@ -229,7 +273,7 @@ class MainActivity : Activity() {
             font-family:sans-serif;text-align:center;padding:40px">
             <h1 style="color:#7f5cff">PABRIK NESHI</h1>
             <p>Game Map Progress Manager</p>
-            <p>Pilih menu MAP untuk membuka AniIdex.</p>
+            <p>Pilih MAP untuk membuka AniIdex.</p>
             </body>
             </html>
             """.trimIndent(),
@@ -239,7 +283,7 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun showMap() {
+    private fun openMap() {
         webView.loadUrl(mapUrl)
     }
 
@@ -252,7 +296,7 @@ class MainActivity : Activity() {
             font-family:sans-serif;padding:30px">
             <h2 style="color:#7f5cff">INFO</h2>
             <p>Pabrik Neshi</p>
-            <p>Progress peta disimpan berdasarkan pelanggan aktif.</p>
+            <p>Progress peta disimpan berdasarkan pelanggan.</p>
             </body>
             </html>
             """.trimIndent(),
@@ -262,7 +306,11 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun showAddCustomer() {
+    // =========================
+    // TAMBAH PELANGGAN
+    // =========================
+
+    private fun addCustomer() {
         val input = EditText(this)
         input.hint = "Nama pelanggan"
 
@@ -270,34 +318,34 @@ class MainActivity : Activity() {
             .setTitle("Tambah Pelanggan")
             .setView(input)
             .setPositiveButton("Simpan") { _, _ ->
+
                 val name = input.text.toString().trim()
 
                 if (name.isEmpty()) {
-                    Toast.makeText(
-                        this,
-                        "Nama tidak boleh kosong",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    toast("Nama pelanggan tidak boleh kosong")
                     return@setPositiveButton
                 }
 
-                if (customers.any { it.equals(name, true) }) {
-                    Toast.makeText(
-                        this,
-                        "Nama pelanggan sudah ada",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                if (customers.any {
+                    it.equals(name, ignoreCase = true)
+                }) {
+                    toast("Nama pelanggan sudah tersedia")
                     return@setPositiveButton
                 }
 
                 customers.add(name)
-                saveProgress(name, "")
-                saveCustomerData()
+                saveCustomerProgress(name, "")
+                saveCustomers()
+
                 switchCustomer(name)
             }
             .setNegativeButton("Batal", null)
             .show()
     }
+
+    // =========================
+    // PILIH PELANGGAN
+    // =========================
 
     private fun showCustomerList() {
         val names = customers.toTypedArray()
@@ -308,34 +356,34 @@ class MainActivity : Activity() {
                 names,
                 customers.indexOf(activeCustomer)
             ) { dialog, which ->
+
                 val selected = customers[which]
                 dialog.dismiss()
+
                 switchCustomer(selected)
             }
             .setNegativeButton("Tutup", null)
             .show()
     }
 
+    // =========================
+    // GANTI PELANGGAN
+    // =========================
+
     private fun switchCustomer(newCustomer: String) {
+
         if (newCustomer == activeCustomer) return
 
-        if (!::webView.isInitialized) {
-            activeCustomer = newCustomer
-            saveCustomerData()
-            updateCustomerLabel()
-            return
-        }
-
-        val oldName = JSONObject.quote(activeCustomer)
+        val oldCustomer = activeCustomer
 
         val saveScript = """
             (function() {
                 try {
                     var value =
-                        localStorage.getItem('$storageKey') || '';
+                        localStorage.getItem('$progressStorageKey') || '';
 
                     PabrikNeshiBridge.saveProgress(
-                        $oldName,
+                        ${JSONObject.quote(oldCustomer)},
                         value
                     );
                 } catch(e) {}
@@ -343,19 +391,32 @@ class MainActivity : Activity() {
         """.trimIndent()
 
         webView.evaluateJavascript(saveScript) {
+
             activeCustomer = newCustomer
-            saveCustomerData()
+            saveCustomers()
             updateCustomerLabel()
 
-            val value = JSONObject.quote(getProgress(newCustomer))
+            val savedProgress =
+                getCustomerProgress(newCustomer)
+
+            val quotedProgress =
+                JSONObject.quote(savedProgress)
 
             val restoreScript = """
                 (function() {
                     try {
-                        localStorage.setItem(
-                            '$storageKey',
-                            $value
-                        );
+                        var value = $quotedProgress;
+
+                        if (value.length > 0) {
+                            localStorage.setItem(
+                                '$progressStorageKey',
+                                value
+                            );
+                        } else {
+                            localStorage.removeItem(
+                                '$progressStorageKey'
+                            );
+                        }
                     } catch(e) {}
                 })();
             """.trimIndent()
@@ -366,13 +427,18 @@ class MainActivity : Activity() {
         }
     }
 
+    // =========================
+    // PEMANTAU PROGRESS
+    // =========================
+
     private fun installProgressWatcher() {
+
         val script = """
             (function() {
                 try {
-                    var key = '$storageKey';
+                    var key = '$progressStorageKey';
 
-                    function saveCurrentProgress(value) {
+                    function saveCurrent(value) {
                         var customer =
                             PabrikNeshiBridge.getActiveCustomer();
 
@@ -382,20 +448,26 @@ class MainActivity : Activity() {
                         );
                     }
 
-                    saveCurrentProgress(
+                    saveCurrent(
                         localStorage.getItem(key) || ''
                     );
 
                     if (!window.__pabrikNeshiWatcher) {
+
                         window.__pabrikNeshiWatcher = true;
 
-                        var originalSet = Storage.prototype.setItem;
+                        var originalSet =
+                            Storage.prototype.setItem;
 
                         Storage.prototype.setItem = function(k, v) {
+
                             originalSet.call(this, k, v);
 
-                            if (this === localStorage && k === key) {
-                                saveCurrentProgress(String(v));
+                            if (
+                                this === localStorage &&
+                                k === key
+                            ) {
+                                saveCurrent(String(v));
                             }
                         };
 
@@ -403,13 +475,18 @@ class MainActivity : Activity() {
                             Storage.prototype.removeItem;
 
                         Storage.prototype.removeItem = function(k) {
+
                             originalRemove.call(this, k);
 
-                            if (this === localStorage && k === key) {
-                                saveCurrentProgress('');
+                            if (
+                                this === localStorage &&
+                                k === key
+                            ) {
+                                saveCurrent('');
                             }
                         };
                     }
+
                 } catch(e) {}
             })();
         """.trimIndent()
@@ -417,11 +494,21 @@ class MainActivity : Activity() {
         webView.evaluateJavascript(script, null)
     }
 
+    // =========================
+    // BRIDGE PELANGGAN
+    // =========================
+
     inner class CustomerBridge {
 
         @JavascriptInterface
-        fun saveProgress(customer: String, value: String) {
-            this@MainActivity.saveProgress(customer, value)
+        fun saveProgress(
+            customer: String,
+            value: String
+        ) {
+            this@MainActivity.saveCustomerProgress(
+                customer,
+                value
+            )
         }
 
         @JavascriptInterface
@@ -430,17 +517,121 @@ class MainActivity : Activity() {
         }
     }
 
+    // =========================
+    // PEMERIKSA DATA PETA
+    // =========================
+
+    private fun inspectMapStorage() {
+
+        if (!webView.url.orEmpty().startsWith(mapUrl)) {
+            toast("Buka MAP terlebih dahulu")
+            return
+        }
+
+        val script = """
+            (function() {
+                try {
+                    var data = {
+                        localStorage: {},
+                        sessionStorage: {},
+                        indexedDBNames: []
+                    };
+
+                    for (
+                        var i = 0;
+                        i < localStorage.length;
+                        i++
+                    ) {
+                        var key = localStorage.key(i);
+                        data.localStorage[key] =
+                            localStorage.getItem(key);
+                    }
+
+                    for (
+                        var j = 0;
+                        j < sessionStorage.length;
+                        j++
+                    ) {
+                        var key2 = sessionStorage.key(j);
+                        data.sessionStorage[key2] =
+                            sessionStorage.getItem(key2);
+                    }
+
+                    if (
+                        indexedDB &&
+                        indexedDB.databases
+                    ) {
+                        indexedDB.databases().then(function(dbs) {
+
+                            data.indexedDBNames =
+                                dbs.map(function(db) {
+                                    return db.name || '(tanpa nama)';
+                                });
+
+                            AndroidStorageInspector.report(
+                                JSON.stringify(data, null, 2)
+                            );
+                        });
+                    } else {
+                        data.indexedDBNames =
+                            ['API tidak tersedia'];
+
+                        AndroidStorageInspector.report(
+                            JSON.stringify(data, null, 2)
+                        );
+                    }
+
+                } catch(e) {
+                    AndroidStorageInspector.report(
+                        'Pemeriksaan gagal: ' + String(e)
+                    );
+                }
+            })();
+        """.trimIndent()
+
+        webView.evaluateJavascript(script, null)
+    }
+
+    inner class StorageInspector {
+
+        @JavascriptInterface
+        fun report(result: String) {
+            runOnUiThread {
+
+                val text = TextView(this@MainActivity)
+                text.text = result
+                text.textSize = 12f
+                text.setTextColor(Color.WHITE)
+                text.setPadding(16, 16, 16, 16)
+
+                val scroll = ScrollView(this@MainActivity)
+                scroll.addView(text)
+
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Data Penyimpanan AniIdex")
+                    .setView(scroll)
+                    .setPositiveButton("Tutup", null)
+                    .show()
+            }
+        }
+    }
+
+    // =========================
+    // SIMPAN SAAT APLIKASI JEDA
+    // =========================
+
     override fun onPause() {
+
         if (::webView.isInitialized) {
+
             val script = """
                 (function() {
                     try {
-                        var customer =
-                            PabrikNeshiBridge.getActiveCustomer();
-
                         PabrikNeshiBridge.saveProgress(
-                            customer,
-                            localStorage.getItem('$storageKey') || ''
+                            PabrikNeshiBridge.getActiveCustomer(),
+                            localStorage.getItem(
+                                '$progressStorageKey'
+                            ) || ''
                         );
                     } catch(e) {}
                 })();
@@ -450,6 +641,14 @@ class MainActivity : Activity() {
         }
 
         super.onPause()
+    }
+
+    private fun toast(message: String) {
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     override fun onBackPressed() {
