@@ -36,7 +36,6 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         loadCustomers()
         createInterface()
     }
@@ -81,10 +80,7 @@ class MainActivity : Activity() {
 
     private fun saveCustomers() {
         prefs.edit()
-            .putString(
-                "customer_list",
-                JSONArray(customers).toString()
-            )
+            .putString("customer_list", JSONArray(customers).toString())
             .putString("active_customer", activeCustomer)
             .apply()
     }
@@ -94,16 +90,10 @@ class MainActivity : Activity() {
     }
 
     private fun getCustomerProgress(name: String): String {
-        return prefs.getString(
-            customerProgressKey(name),
-            ""
-        ) ?: ""
+        return prefs.getString(customerProgressKey(name), "") ?: ""
     }
 
-    private fun saveCustomerProgress(
-        name: String,
-        value: String
-    ) {
+    private fun saveCustomerProgress(name: String, value: String) {
         prefs.edit()
             .putString(customerProgressKey(name), value)
             .apply()
@@ -207,7 +197,6 @@ class MainActivity : Activity() {
         )
 
         webView.webViewClient = object : WebViewClient() {
-
             override fun onPageFinished(
                 view: WebView?,
                 url: String?
@@ -256,8 +245,7 @@ class MainActivity : Activity() {
     }
 
     private fun updateCustomerLabel() {
-        customerText.text =
-            "Pelanggan aktif: $activeCustomer"
+        customerText.text = "Pelanggan aktif: $activeCustomer"
     }
 
     // =========================
@@ -318,7 +306,6 @@ class MainActivity : Activity() {
             .setTitle("Tambah Pelanggan")
             .setView(input)
             .setPositiveButton("Simpan") { _, _ ->
-
                 val name = input.text.toString().trim()
 
                 if (name.isEmpty()) {
@@ -336,7 +323,6 @@ class MainActivity : Activity() {
                 customers.add(name)
                 saveCustomerProgress(name, "")
                 saveCustomers()
-
                 switchCustomer(name)
             }
             .setNegativeButton("Batal", null)
@@ -356,10 +342,8 @@ class MainActivity : Activity() {
                 names,
                 customers.indexOf(activeCustomer)
             ) { dialog, which ->
-
                 val selected = customers[which]
                 dialog.dismiss()
-
                 switchCustomer(selected)
             }
             .setNegativeButton("Tutup", null)
@@ -371,7 +355,6 @@ class MainActivity : Activity() {
     // =========================
 
     private fun switchCustomer(newCustomer: String) {
-
         if (newCustomer == activeCustomer) return
 
         val oldCustomer = activeCustomer
@@ -391,16 +374,12 @@ class MainActivity : Activity() {
         """.trimIndent()
 
         webView.evaluateJavascript(saveScript) {
-
             activeCustomer = newCustomer
             saveCustomers()
             updateCustomerLabel()
 
-            val savedProgress =
-                getCustomerProgress(newCustomer)
-
-            val quotedProgress =
-                JSONObject.quote(savedProgress)
+            val savedProgress = getCustomerProgress(newCustomer)
+            val quotedProgress = JSONObject.quote(savedProgress)
 
             val restoreScript = """
                 (function() {
@@ -432,7 +411,6 @@ class MainActivity : Activity() {
     // =========================
 
     private fun installProgressWatcher() {
-
         val script = """
             (function() {
                 try {
@@ -453,14 +431,11 @@ class MainActivity : Activity() {
                     );
 
                     if (!window.__pabrikNeshiWatcher) {
-
                         window.__pabrikNeshiWatcher = true;
 
-                        var originalSet =
-                            Storage.prototype.setItem;
+                        var originalSet = Storage.prototype.setItem;
 
                         Storage.prototype.setItem = function(k, v) {
-
                             originalSet.call(this, k, v);
 
                             if (
@@ -471,11 +446,9 @@ class MainActivity : Activity() {
                             }
                         };
 
-                        var originalRemove =
-                            Storage.prototype.removeItem;
+                        var originalRemove = Storage.prototype.removeItem;
 
                         Storage.prototype.removeItem = function(k) {
-
                             originalRemove.call(this, k);
 
                             if (
@@ -486,7 +459,6 @@ class MainActivity : Activity() {
                             }
                         };
                     }
-
                 } catch(e) {}
             })();
         """.trimIndent()
@@ -501,10 +473,7 @@ class MainActivity : Activity() {
     inner class CustomerBridge {
 
         @JavascriptInterface
-        fun saveProgress(
-            customer: String,
-            value: String
-        ) {
+        fun saveProgress(customer: String, value: String) {
             this@MainActivity.saveCustomerProgress(
                 customer,
                 value
@@ -522,7 +491,6 @@ class MainActivity : Activity() {
     // =========================
 
     private fun inspectMapStorage() {
-
         if (!webView.url.orEmpty().startsWith(mapUrl)) {
             toast("Buka MAP terlebih dahulu")
             return
@@ -532,58 +500,50 @@ class MainActivity : Activity() {
             (function() {
                 try {
                     var data = {
+                        status: "Berhasil membaca penyimpanan",
                         localStorage: {},
                         sessionStorage: {},
+                        progressValue: localStorage.getItem(
+                            "aniidex.map-progress"
+                        ),
                         indexedDBNames: []
                     };
 
-                    for (
-                        var i = 0;
-                        i < localStorage.length;
-                        i++
-                    ) {
+                    for (var i = 0; i < localStorage.length; i++) {
                         var key = localStorage.key(i);
                         data.localStorage[key] =
                             localStorage.getItem(key);
                     }
 
-                    for (
-                        var j = 0;
-                        j < sessionStorage.length;
-                        j++
-                    ) {
+                    for (var j = 0; j < sessionStorage.length; j++) {
                         var key2 = sessionStorage.key(j);
                         data.sessionStorage[key2] =
                             sessionStorage.getItem(key2);
                     }
 
-                    if (
-                        indexedDB &&
-                        indexedDB.databases
-                    ) {
-                        indexedDB.databases().then(function(dbs) {
-
-                            data.indexedDBNames =
-                                dbs.map(function(db) {
-                                    return db.name || '(tanpa nama)';
-                                });
-
-                            AndroidStorageInspector.report(
-                                JSON.stringify(data, null, 2)
-                            );
-                        });
-                    } else {
-                        data.indexedDBNames =
-                            ['API tidak tersedia'];
-
+                    function sendResult() {
                         AndroidStorageInspector.report(
                             JSON.stringify(data, null, 2)
                         );
                     }
 
+                    // Kirim data langsung, tidak menunggu IndexedDB.
+                    sendResult();
+
+                    // Pemeriksaan IndexedDB hanya tambahan.
+                    if (
+                        window.indexedDB &&
+                        typeof indexedDB.databases === "function"
+                    ) {
+                        indexedDB.databases().then(function(dbs) {
+                            data.indexedDBNames = dbs.map(function(db) {
+                                return db.name || "(tanpa nama)";
+                            });
+                        }).catch(function() {});
+                    }
                 } catch(e) {
                     AndroidStorageInspector.report(
-                        'Pemeriksaan gagal: ' + String(e)
+                        "Pemeriksaan gagal: " + String(e)
                     );
                 }
             })();
@@ -597,7 +557,6 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun report(result: String) {
             runOnUiThread {
-
                 val text = TextView(this@MainActivity)
                 text.text = result
                 text.textSize = 12f
@@ -621,9 +580,7 @@ class MainActivity : Activity() {
     // =========================
 
     override fun onPause() {
-
         if (::webView.isInitialized) {
-
             val script = """
                 (function() {
                     try {
