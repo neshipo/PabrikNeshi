@@ -26,7 +26,8 @@ jobs:
         run: |
           unzip -q PabrikNeshi_Test_v0.1.4_Ready.zip -d source
           find source -name settings.gradle -o -name settings.gradle.kts
-
+          find source -maxdepth 5 -type f | sort | head -200
+          
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
