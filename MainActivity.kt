@@ -492,68 +492,67 @@ class MainActivity : Activity() {
     // PEMERIKSA DATA PETA
     // =========================
 
-    private fun inspectMapStorage() {
-        if (!webView.url.orEmpty().startsWith(mapUrl)) {
-            toast("Buka MAP terlebih dahulu")
-            return
-        }
-
-        val script = """
-            (function() {
-                try {
-                    var data = {
-                        status: "Berhasil membaca penyimpanan",
-                        localStorage: {},
-                        sessionStorage: {},
-                        progressValue: localStorage.getItem(
-                            "aniidex.map-progress"
-                        ),
-                        indexedDBNames: []
-                    };
-
-                    for (var i = 0; i < localStorage.length; i++) {
-                        var key = localStorage.key(i);
-                        data.localStorage[key] =
-                            localStorage.getItem(key);
-                    }
-
-                    for (var j = 0; j < sessionStorage.length; j++) {
-                        var key2 = sessionStorage.key(j);
-                        data.sessionStorage[key2] =
-                            sessionStorage.getItem(key2);
-                    }
-
-                    function sendResult() {
-                        AndroidStorageInspector.report(
-                            JSON.stringify(data, null, 2)
-                        );
-                    }
-
-                    // Kirim data langsung, tidak menunggu IndexedDB.
-                    sendResult();
-
-                    // Pemeriksaan IndexedDB hanya tambahan.
-                    if (
-                        window.indexedDB &&
-                        typeof indexedDB.databases === "function"
-                    ) {
-                        indexedDB.databases().then(function(dbs) {
-                            data.indexedDBNames = dbs.map(function(db) {
-                                return db.name || "(tanpa nama)";
-                            });
-                        }).catch(function() {});
-                    }
-                } catch(e) {
-                    AndroidStorageInspector.report(
-                        "Pemeriksaan gagal: " + String(e)
-                    );
-                }
-            })();
-        """.trimIndent()
-
-        webView.evaluateJavascript(script, null)
+    
+private fun inspectMapStorage() {
+    if (!webView.url.orEmpty().startsWith(mapUrl)) {
+        toast("Buka MAP terlebih dahulu")
+        return
     }
 
+    val script = """
+        (function() {
+            try {
+                var data = {
+                    status: "Berhasil membaca penyimpanan",
+                    url: location.href,
+                    localStorage: {},
+                    sessionStorage: {},
+                    progressValue: localStorage.getItem("aniidex.map-progress")
+                };
+
+                for (var i = 0; i < localStorage.length; i++) {
+                    var key = localStorage.key(i);
+                    data.localStorage[key] =
+                        localStorage.getItem(key);
+                }
+
+                for (var j = 0; j < sessionStorage.length; j++) {
+                    var key2 = sessionStorage.key(j);
+                    data.sessionStorage[key2] =
+                        sessionStorage.getItem(key2);
+                }
+
+                return JSON.stringify(data, null, 2);
+            } catch(e) {
+                return "Gagal membaca: " + String(e);
+            }
+        })();
+    """.trimIndent()
+
+    webView.evaluateJavascript(script) { result ->
+        val output = try {
+            org.json.JSONTokener(result ?: "null")
+                .nextValue()?.toString() ?: "Tidak ada hasil"
+        } catch (e: Exception) {
+            result ?: "Tidak ada hasil"
+        }
+
+        val text = TextView(this)
+        text.text = output
+        text.textSize = 12f
+        text.setTextColor(Color.WHITE)
+        text.setPadding(16, 16, 16, 16)
+
+        val scroll = ScrollView(this)
+        scroll.addView(text)
+
+        AlertDialog.Builder(this)
+            .setTitle("Data Penyimpanan AniIdex")
+            .setView(scroll)
+            .setPositiveButton("Tutup", null)
+            .show()
+    }
+}
     inner class StorageInspector {
 
         @JavascriptInterface
