@@ -28,6 +28,7 @@ jobs:
           find source -name settings.gradle -o -name settings.gradle.kts
           find source -maxdepth 5 -type f | sort | head -200
           find source/PabrikNeshi_Android_Starter/app/src/main -type f
+          cat source/PabrikNeshi_Android_Starter/app/src/main/java/com/neshi/pabrikneshi/MainActivity.kt
           
       - name: Set up Java
         uses: actions/setup-java@v4
