@@ -23,7 +23,7 @@ jobs:
 
       - name: Extract project ZIP
         run: |
-          unzip -q  PabrikNeshi_Android_Starter_v0.1.2_FIXED.zip -d source
+          unzip -q  PabrikNeshi_Android_Starter_v0.1.2_FIXED.zip. -d source
           find source -maxdepth 3 -name settings.gradle -o -name settings.gradle.kts
 
       - name: Set up Java
