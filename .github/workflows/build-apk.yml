@@ -25,6 +25,9 @@ jobs:
       - name: Extract project ZIP
         run: |
           unzip -q PabrikNeshi_Test_v0.1.4_Ready.zip -d source
+          - name: Cek lokasi MainActivity
+        run: |
+          find source -name MainActivity.kt
           cp MainActivity.kt source/PabrikNeshi_Android_Starter/app/src/main/java/com/neshi/pabrikneshi/MainActivity.kt
           find source -name settings.gradle -o -name settings.gradle.kts
           find source -maxdepth 5 -type f | sort | head -200
