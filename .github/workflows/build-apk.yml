@@ -1,78 +1,77 @@
 
-
 name: Build Pabrik Neshi APK
 
 on:
-workflow_dispatch:
-push:
-branches: [main]
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
-contents: read
+  contents: read
 
 jobs:
-build:
-runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-env:  
-  ANDROID_HOME: /usr/local/lib/android/sdk  
-  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk  
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
-steps:  
-  - name: Checkout repository  
-    uses: actions/checkout@v4  
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Extract project ZIP  
-    run: |  
-      unzip -q PabrikNeshi_Android_Starter_v0.1.3_FIXED.zip  -d source  
-      find source -maxdepth 3 -name settings.gradle -o -name settings.gradle.kts  
+      - name: Extract project ZIP
+        run: |
+          unzip -q PabrikNeshi_Android_Starter_v0.1.3_FIXED.zip -d source
+          find source -name settings.gradle -o -name settings.gradle.kts
 
-  - name: Set up Java  
-    uses: actions/setup-java@v4  
-    with:  
-      distribution: temurin  
-      java-version: '17'  
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-  - name: Set up Gradle  
-    uses: gradle/actions/setup-gradle@v4  
-    with:  
-      gradle-version: '8.11.1'  
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
 
-  - name: Install Android SDK packages  
-    run: |  
-      SDKMANAGER="$(command -v sdkmanager || true)"  
-      if [ -z "$SDKMANAGER" ]; then  
-        SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)"  
-      fi  
-      if [ ! -x "$SDKMANAGER" ]; then  
-        echo "sdkmanager not found"  
-        exit 1  
-      fi  
-      yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true  
-      "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \  
-        "platform-tools" \  
-        "platforms;android-35" \  
-        "build-tools;35.0.0"  
+      - name: Install Android SDK packages
+        run: |
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)"
+          fi
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found"
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
-  - name: Locate Android project  
-    run: |  
-      PROJECT_DIR="$(dirname "$(find source -name settings.gradle -o -name settings.gradle.kts | head -n 1)")"  
-      if [ -z "$PROJECT_DIR" ]; then  
-        echo "Gradle project not found in ZIP"  
-        exit 1  
-      fi  
-      echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"  
+      - name: Locate Android project
+        run: |
+          PROJECT_DIR="$(dirname "$(find source -name settings.gradle -o -name settings.gradle.kts | head -n 1)")"
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Gradle project not found in ZIP"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-    
-  - name: Build APK  
-    run: |  
-      cd "$PROJECT_DIR"  
-      gradle --no-daemon -Pkotlin.jvm.target.validation.mode=warning :app:assembleDebug  
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle --no-daemon -Pkotlin.jvm.target.validation.mode=warning :app:assembleDebug
 
-
-  - name: Upload APK  
-    uses: actions/upload-artifact@v4  
-    with:  
-      name: Pabrik-Neshi-APK  
-      path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk  
-      if-no-files-found: error
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pabrik-Neshi-APK
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          
