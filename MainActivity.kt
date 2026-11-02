@@ -1,7 +1,7 @@
 
 package com.neshi.pabrikneshi
 
-import android.widget.Toast
+
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
@@ -31,9 +31,6 @@ class MainActivity : Activity() {
     private val prefs by lazy {
         getSharedPreferences(prefsName, MODE_PRIVATE)
 
-    private fun inspectMapStorage() {
-    Toast.makeText(this, "Cek Data berhasil dipanggil", Toast.LENGTH_LONG).show()
-    
     }
 
     private var customers = mutableListOf<String>()
