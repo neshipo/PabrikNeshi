@@ -25,15 +25,33 @@ jobs:
       - name: Extract project ZIP
         run: |
           unzip -q PabrikNeshi_Test_v0.1.4_Ready.zip -d source
-          - name: Cek lokasi MainActivity
+
+      - name: Locate and replace MainActivity
         run: |
+          echo "Mencari MainActivity..."
           find source -name MainActivity.kt
-          cp MainActivity.kt source/PabrikNeshi_Android_Starter/app/src/main/java/com/neshi/pabrikneshi/MainActivity.kt
+
+          TARGET="source/PabrikNeshi_Android_Starter/app/src/main/java/com/neshi/pabrikneshi/MainActivity.kt"
+
+          if [ ! -f "$TARGET" ]; then
+            echo "MainActivity tujuan tidak ditemukan!"
+            exit 1
+          fi
+
+          if [ ! -f "MainActivity.kt" ]; then
+            echo "MainActivity.kt di folder utama tidak ditemukan!"
+            exit 1
+          fi
+
+          cp MainActivity.kt "$TARGET"
+
+          echo "MainActivity berhasil diganti."
+          head -20 "$TARGET"
+
+      - name: Locate Gradle project
+        run: |
           find source -name settings.gradle -o -name settings.gradle.kts
-          find source -maxdepth 5 -type f | sort | head -200
-          find source/PabrikNeshi_Android_Starter/app/src/main -type f
-          cat source/PabrikNeshi_Android_Starter/app/src/main/java/com/neshi/pabrikneshi/MainActivity.kt
-          
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -48,14 +66,18 @@ jobs:
       - name: Install Android SDK packages
         run: |
           SDKMANAGER="$(command -v sdkmanager || true)"
+
           if [ -z "$SDKMANAGER" ]; then
             SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)"
           fi
+
           if [ ! -x "$SDKMANAGER" ]; then
             echo "sdkmanager not found"
             exit 1
           fi
+
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
+
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
             "platform-tools" \
             "platforms;android-35" \
@@ -63,12 +85,15 @@ jobs:
 
       - name: Locate Android project
         run: |
-          PROJECT_DIR="$(dirname "$(find source -name settings.gradle -o -name settings.gradle.kts | head -n 1)")"
-          if [ -z "$PROJECT_DIR" ]; then
+          PROJECT_DIR="$(dirname "$(find source \( -name settings.gradle -o -name settings.gradle.kts \) | head -n 1)")"
+
+          if [ -z "$PROJECT_DIR" ] || [ "$PROJECT_DIR" = "." ]; then
             echo "Gradle project not found in ZIP"
             exit 1
           fi
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project ditemukan: $PROJECT_DIR"
 
       - name: Build APK
         run: |
@@ -81,4 +106,3 @@ jobs:
           name: Pabrik-Neshi-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          
