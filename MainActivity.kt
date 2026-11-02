@@ -4,7 +4,6 @@ package com.neshi.pabrikneshi
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
-import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -37,7 +36,6 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         loadCustomerData()
         buildInterface()
     }
@@ -48,11 +46,7 @@ class MainActivity : Activity() {
         if (saved == null) {
             customers = mutableListOf("Pelanggan Lama")
             activeCustomer = "Pelanggan Lama"
-
-            prefs.edit()
-                .putString("customer_list", JSONArray(customers).toString())
-                .putString("active_customer", activeCustomer)
-                .apply()
+            saveCustomerData()
         } else {
             try {
                 val array = JSONArray(saved)
@@ -88,7 +82,7 @@ class MainActivity : Activity() {
     }
 
     private fun progressKey(customer: String): String {
-        return "progress_" + customer
+        return "progress_$customer"
     }
 
     private fun getProgress(customer: String): String {
@@ -151,23 +145,17 @@ class MainActivity : Activity() {
         navigation.setPadding(5, 5, 5, 5)
 
         navigation.addView(
-            makeButton("HOME") {
-                showHome()
-            },
+            makeButton("HOME") { showHome() },
             weightedParams()
         )
 
         navigation.addView(
-            makeButton("MAP") {
-                showMap()
-            },
+            makeButton("MAP") { showMap() },
             weightedParams()
         )
 
         navigation.addView(
-            makeButton("INFO") {
-                showInfo()
-            },
+            makeButton("INFO") { showInfo() },
             weightedParams()
         )
 
@@ -186,7 +174,10 @@ class MainActivity : Activity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                installProgressWatcher()
+
+                if (url?.startsWith(mapUrl) == true) {
+                    installProgressWatcher()
+                }
             }
         }
 
@@ -284,7 +275,7 @@ class MainActivity : Activity() {
                 if (name.isEmpty()) {
                     Toast.makeText(
                         this,
-                        "Nama pelanggan tidak boleh kosong",
+                        "Nama tidak boleh kosong",
                         Toast.LENGTH_SHORT
                     ).show()
                     return@setPositiveButton
@@ -302,7 +293,6 @@ class MainActivity : Activity() {
                 customers.add(name)
                 saveProgress(name, "")
                 saveCustomerData()
-
                 switchCustomer(name)
             }
             .setNegativeButton("Batal", null)
@@ -329,8 +319,6 @@ class MainActivity : Activity() {
     private fun switchCustomer(newCustomer: String) {
         if (newCustomer == activeCustomer) return
 
-        val oldCustomer = activeCustomer
-
         if (!::webView.isInitialized) {
             activeCustomer = newCustomer
             saveCustomerData()
@@ -338,33 +326,35 @@ class MainActivity : Activity() {
             return
         }
 
-        // Simpan progress pelanggan lama terlebih dahulu.
-        val oldName = JSONObject.quote(oldCustomer)
+        val oldName = JSONObject.quote(activeCustomer)
 
-        val saveOldScript = """
+        val saveScript = """
             (function() {
                 try {
-                    var value = localStorage.getItem('$storageKey') || '';
-                    PabrikNeshiBridge.saveProgress($oldName, value);
+                    var value =
+                        localStorage.getItem('$storageKey') || '';
+
+                    PabrikNeshiBridge.saveProgress(
+                        $oldName,
+                        value
+                    );
                 } catch(e) {}
             })();
         """.trimIndent()
 
-        webView.evaluateJavascript(saveOldScript) {
-            // Setelah penyimpanan pelanggan lama, pulihkan data pelanggan baru.
+        webView.evaluateJavascript(saveScript) {
             activeCustomer = newCustomer
             saveCustomerData()
             updateCustomerLabel()
 
-            val newValue = getProgress(newCustomer)
-            val quotedValue = JSONObject.quote(newValue)
+            val value = JSONObject.quote(getProgress(newCustomer))
 
             val restoreScript = """
                 (function() {
                     try {
                         localStorage.setItem(
                             '$storageKey',
-                            $quotedValue
+                            $value
                         );
                     } catch(e) {}
                 })();
@@ -377,43 +367,46 @@ class MainActivity : Activity() {
     }
 
     private fun installProgressWatcher() {
-        val customer = JSONObject.quote(activeCustomer)
-
         val script = """
             (function() {
                 try {
                     var key = '$storageKey';
-                    var customer = $customer;
 
-                    // Simpan progress yang sedang terbuka.
-                    var current = localStorage.getItem(key) || '';
-                    PabrikNeshiBridge.saveProgress(customer, current);
+                    function saveCurrentProgress(value) {
+                        var customer =
+                            PabrikNeshiBridge.getActiveCustomer();
 
-                    // Pantau perubahan data progress.
+                        PabrikNeshiBridge.saveProgress(
+                            customer,
+                            value || ''
+                        );
+                    }
+
+                    saveCurrentProgress(
+                        localStorage.getItem(key) || ''
+                    );
+
                     if (!window.__pabrikNeshiWatcher) {
                         window.__pabrikNeshiWatcher = true;
 
                         var originalSet = Storage.prototype.setItem;
+
                         Storage.prototype.setItem = function(k, v) {
                             originalSet.call(this, k, v);
 
-                            if (k === key) {
-                                PabrikNeshiBridge.saveProgress(
-                                    customer,
-                                    String(v)
-                                );
+                            if (this === localStorage && k === key) {
+                                saveCurrentProgress(String(v));
                             }
                         };
 
-                        var originalRemove = Storage.prototype.removeItem;
+                        var originalRemove =
+                            Storage.prototype.removeItem;
+
                         Storage.prototype.removeItem = function(k) {
                             originalRemove.call(this, k);
 
-                            if (k === key) {
-                                PabrikNeshiBridge.saveProgress(
-                                    customer,
-                                    ''
-                                );
+                            if (this === localStorage && k === key) {
+                                saveCurrentProgress('');
                             }
                         };
                     }
@@ -425,21 +418,28 @@ class MainActivity : Activity() {
     }
 
     inner class CustomerBridge {
+
         @JavascriptInterface
         fun saveProgress(customer: String, value: String) {
-            saveProgress(customer, value)
+            this@MainActivity.saveProgress(customer, value)
+        }
+
+        @JavascriptInterface
+        fun getActiveCustomer(): String {
+            return activeCustomer
         }
     }
 
     override fun onPause() {
         if (::webView.isInitialized) {
-            val customer = JSONObject.quote(activeCustomer)
-
             val script = """
                 (function() {
                     try {
+                        var customer =
+                            PabrikNeshiBridge.getActiveCustomer();
+
                         PabrikNeshiBridge.saveProgress(
-                            $customer,
+                            customer,
                             localStorage.getItem('$storageKey') || ''
                         );
                     } catch(e) {}
